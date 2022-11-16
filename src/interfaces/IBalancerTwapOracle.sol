@@ -24,7 +24,7 @@ pragma solidity ^0.8.0;
  * Once the oracle is fully initialized, all queries are guaranteed to succeed as long as they require no data that
  * is not older than the largest safe query window.
  */
-interface IBalancerPriceOracle {
+interface IBalancerTwapOracle {
     // The three values that can be queried:
     //
     // - PAIR_PRICE: the price of the tokens in the Pool, expressed as the price of the second token in units of the

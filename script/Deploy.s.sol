@@ -8,7 +8,7 @@ import {IERC20Mintable} from "../src/interfaces/IERC20Mintable.sol";
 
 import {OptionsToken} from "../src/OptionsToken.sol";
 import {BalancerOracle} from "../src/oracles/BalancerOracle.sol";
-import {IBalancerPriceOracle} from "../src/interfaces/IBalancerPriceOracle.sol";
+import {IBalancerTwapOracle} from "../src/interfaces/IBalancerTwapOracle.sol";
 
 contract DeployScript is Script {
     function run() public returns (OptionsToken optionsToken, BalancerOracle oracle) {
@@ -16,7 +16,7 @@ contract DeployScript is Script {
         vm.startBroadcast(deployerPrivateKey);
 
         {
-            IBalancerPriceOracle balancerPriceOracle = IBalancerPriceOracle(vm.envAddress("BALANCER_POOL"));
+            IBalancerTwapOracle balancerPriceOracle = IBalancerTwapOracle(vm.envAddress("BALANCER_POOL"));
             address owner = vm.envAddress("OWNER");
             uint16 multiplier = uint16(vm.envUint("ORACLE_MULTIPLIER"));
             uint56 secs = uint56(vm.envUint("ORACLE_SECS"));

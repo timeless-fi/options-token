@@ -5,7 +5,7 @@ import {Owned} from "solmate/auth/Owned.sol";
 import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 
 import {IOracle} from "../interfaces/IOracle.sol";
-import {IBalancerPriceOracle} from "../interfaces/IBalancerPriceOracle.sol";
+import {IBalancerTwapOracle} from "../interfaces/IBalancerTwapOracle.sol";
 
 /// @title Oracle using Balancer TWAP oracle as data source
 /// @author zefram.eth
@@ -43,8 +43,8 @@ contract BalancerOracle is IOracle, Owned {
     /// Immutable parameters
     /// -----------------------------------------------------------------------
 
-    /// @notice The Balancer oracle contract (usually a pool with oracle support)
-    IBalancerPriceOracle public immutable balancerOracle;
+    /// @notice The Balancer TWAP oracle contract (usually a pool with oracle support)
+    IBalancerTwapOracle public immutable balancerTwapOracle;
 
     /// -----------------------------------------------------------------------
     /// Storage variables
@@ -70,14 +70,14 @@ contract BalancerOracle is IOracle, Owned {
     /// -----------------------------------------------------------------------
 
     constructor(
-        IBalancerPriceOracle balancerOracle_,
+        IBalancerTwapOracle balancerTwapOracle_,
         address owner_,
         uint16 multiplier_,
         uint56 secs_,
         uint56 ago_,
         uint128 minPrice_
     ) Owned(owner_) {
-        balancerOracle = balancerOracle_;
+        balancerTwapOracle = balancerTwapOracle_;
         multiplier = multiplier_;
         secs = secs_;
         ago = ago_;
@@ -105,7 +105,7 @@ contract BalancerOracle is IOracle, Owned {
 
         // ensure the Balancer oracle can return a TWAP value for the specified window
         {
-            uint256 largestSafeQueryWindow = balancerOracle.getLargestSafeQueryWindow();
+            uint256 largestSafeQueryWindow = balancerTwapOracle.getLargestSafeQueryWindow();
             if (secs_ + ago_ > largestSafeQueryWindow) revert BalancerOracle__TWAPOracleNotReady();
         }
 
@@ -115,13 +115,13 @@ contract BalancerOracle is IOracle, Owned {
 
         // query Balancer oracle to get TWAP value
         {
-            IBalancerPriceOracle.OracleAverageQuery[] memory queries = new IBalancerPriceOracle.OracleAverageQuery[](1);
-            queries[0] = IBalancerPriceOracle.OracleAverageQuery({
-                variable: IBalancerPriceOracle.Variable.PAIR_PRICE,
+            IBalancerTwapOracle.OracleAverageQuery[] memory queries = new IBalancerTwapOracle.OracleAverageQuery[](1);
+            queries[0] = IBalancerTwapOracle.OracleAverageQuery({
+                variable: IBalancerTwapOracle.Variable.PAIR_PRICE,
                 secs: secs_,
                 ago: ago_
             });
-            price = balancerOracle.getTimeWeightedAverage(queries)[0];
+            price = balancerTwapOracle.getTimeWeightedAverage(queries)[0];
         }
 
         // apply multiplier to price

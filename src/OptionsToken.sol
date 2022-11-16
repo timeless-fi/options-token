@@ -12,7 +12,8 @@ import {IERC20Mintable} from "./interfaces/IERC20Mintable.sol";
 /// @title Options Token
 /// @author zefram.eth
 /// @notice Options token representing the right to purchase the underlying token
-/// at an oracle-specified rate
+/// at an oracle-specified rate. Similar to call options but with a variable strike
+/// price that's always at a certain discount to the market price.
 /// @dev Assumes the underlying token and the payment token both use 18 decimals.
 contract OptionsToken is ERC20, Owned, IERC20Mintable {
     /// -----------------------------------------------------------------------
@@ -47,7 +48,7 @@ contract OptionsToken is ERC20, Owned, IERC20Mintable {
     /// -----------------------------------------------------------------------
 
     /// @notice The oracle contract that provides the current price to purchase
-    /// the underlying token while exercising options
+    /// the underlying token while exercising options (the strike price)
     IOracle public oracle;
 
     /// @notice The treasury address which receives tokens paid during redemption
