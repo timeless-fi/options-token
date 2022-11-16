@@ -13,6 +13,7 @@ import {IERC20Mintable} from "./interfaces/IERC20Mintable.sol";
 /// @author zefram.eth
 /// @notice Options token representing the right to purchase the underlying token
 /// at an oracle-specified rate
+/// @dev Assumes the underlying token and the payment token both use 18 decimals.
 contract OptionsToken is ERC20, Owned, IERC20Mintable {
     /// -----------------------------------------------------------------------
     /// Library usage
