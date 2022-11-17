@@ -4,10 +4,10 @@ pragma solidity ^0.8.13;
 import "forge-std/Script.sol";
 
 import {ERC20} from "solmate/tokens/ERC20.sol";
-import {IERC20Mintable} from "../src/interfaces/IERC20Mintable.sol";
 
 import {OptionsToken} from "../src/OptionsToken.sol";
 import {BalancerOracle} from "../src/oracles/BalancerOracle.sol";
+import {IERC20Mintable} from "../src/interfaces/IERC20Mintable.sol";
 import {IBalancerTwapOracle} from "../src/interfaces/IBalancerTwapOracle.sol";
 
 contract DeployScript is Script {
