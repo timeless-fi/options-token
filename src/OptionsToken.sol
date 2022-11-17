@@ -31,6 +31,14 @@ contract OptionsToken is ERC20, Owned, IERC20Mintable {
     error OptionsToken__SlippageTooHigh();
 
     /// -----------------------------------------------------------------------
+    /// Events
+    /// -----------------------------------------------------------------------
+
+    event Exercise(address indexed sender, address indexed recipient, uint256 amount, uint256 paymentAmount);
+    event SetOracle(IOracle indexed newOracle);
+    event SetTreasury(address indexed newTreasury);
+
+    /// -----------------------------------------------------------------------
     /// Immutable parameters
     /// -----------------------------------------------------------------------
 
@@ -73,6 +81,9 @@ contract OptionsToken is ERC20, Owned, IERC20Mintable {
         underlyingToken = underlyingToken_;
         oracle = oracle_;
         treasury = treasury_;
+
+        emit SetOracle(oracle_);
+        emit SetTreasury(treasury_);
     }
 
     /// -----------------------------------------------------------------------
@@ -120,6 +131,8 @@ contract OptionsToken is ERC20, Owned, IERC20Mintable {
 
         // mint underlying tokens to recipient
         underlyingToken.mint(recipient, amount);
+
+        emit Exercise(msg.sender, recipient, amount, paymentAmount);
     }
 
     /// -----------------------------------------------------------------------
@@ -130,11 +143,13 @@ contract OptionsToken is ERC20, Owned, IERC20Mintable {
     /// @param oracle_ The new oracle contract
     function setOracle(IOracle oracle_) external onlyOwner {
         oracle = oracle_;
+        emit SetOracle(oracle_);
     }
 
     /// @notice Sets the treasury address. Only callable by the owner.
     /// @param treasury_ The new treasury address
     function setTreasury(address treasury_) external onlyOwner {
         treasury = treasury_;
+        emit SetTreasury(treasury_);
     }
 }

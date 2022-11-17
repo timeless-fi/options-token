@@ -32,6 +32,12 @@ contract BalancerOracle is IOracle, Owned {
     error BalancerOracle__TWAPOracleNotReady();
 
     /// -----------------------------------------------------------------------
+    /// Events
+    /// -----------------------------------------------------------------------
+
+    event SetParams(uint16 multiplier, uint56 secs, uint56 ago, uint128 minPrice);
+
+    /// -----------------------------------------------------------------------
     /// Constants
     /// -----------------------------------------------------------------------
 
@@ -82,6 +88,8 @@ contract BalancerOracle is IOracle, Owned {
         secs = secs_;
         ago = ago_;
         minPrice = minPrice_;
+
+        emit SetParams(multiplier_, secs_, ago_, minPrice_);
     }
 
     /// -----------------------------------------------------------------------
@@ -148,5 +156,6 @@ contract BalancerOracle is IOracle, Owned {
         secs = secs_;
         ago = ago_;
         minPrice = minPrice_;
+        emit SetParams(multiplier_, secs_, ago_, minPrice_);
     }
 }
