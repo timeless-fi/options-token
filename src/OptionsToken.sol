@@ -104,12 +104,17 @@ contract OptionsToken is ERC20, Owned, IERC20Mintable {
         /// State updates
         /// -----------------------------------------------------------------------
 
+        // skip if amount is zero
+        if (amount == 0) return;
+
+        // mint options tokens
         _mint(to, amount);
     }
 
     /// @notice Exercises options tokens to purchase the underlying tokens.
     /// @dev The options tokens are not burnt but sent to address(0) to avoid messing up the
-    /// inflation schedule
+    /// inflation schedule.
+    /// The oracle may revert if it cannot give a secure result.
     /// @param amount The amount of options tokens to exercise
     /// @param maxPaymentAmount The maximum acceptable amount to pay. Used for slippage protection.
     /// @param recipient The recipient of the purchased underlying tokens
@@ -119,6 +124,9 @@ contract OptionsToken is ERC20, Owned, IERC20Mintable {
         virtual
         returns (uint256 paymentAmount)
     {
+        // skip if amount is zero
+        if (amount == 0) return 0;
+
         // transfer options tokens from msg.sender to address(0)
         // we transfer instead of burn because TokenAdmin cares about totalSupply
         // which we don't want to change in order to follow the emission schedule
