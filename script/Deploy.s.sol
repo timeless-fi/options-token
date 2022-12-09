@@ -9,7 +9,9 @@ import {BalancerOracle} from "../src/oracles/BalancerOracle.sol";
 import {IERC20Mintable} from "../src/interfaces/IERC20Mintable.sol";
 import {IBalancerTwapOracle} from "../src/interfaces/IBalancerTwapOracle.sol";
 
-contract DeployScript is CREATE3Script("1.0.0") {
+contract DeployScript is CREATE3Script {
+    constructor() CREATE3Script(vm.envString("VERSION")) {}
+
     function run() public returns (OptionsToken optionsToken, BalancerOracle oracle) {
         uint256 deployerPrivateKey = uint256(vm.envBytes32("PRIVATE_KEY"));
 
