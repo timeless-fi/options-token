@@ -167,4 +167,22 @@ contract OptionsTokenTest is Test {
         vm.expectRevert(bytes4(keccak256("BalancerOracle__TWAPOracleNotReady()")));
         optionsToken.exercise(amount, expectedPaymentAmount, recipient);
     }
+
+    function test_exercisePastDeadline(uint256 amount, address recipient, uint256 deadline) public {
+        amount = bound(amount, 0, MAX_SUPPLY);
+        deadline = bound(deadline, 0, block.timestamp - 1);
+
+        // mint options tokens
+        vm.prank(tokenAdmin);
+        optionsToken.mint(address(this), amount);
+
+        // mint payment tokens
+        uint256 expectedPaymentAmount =
+            amount.mulWadUp(ORACLE_INIT_TWAP_VALUE.mulDivUp(ORACLE_MULTIPLIER, ORACLE_MIN_PRICE_DENOM));
+        paymentToken.mint(address(this), expectedPaymentAmount);
+
+        // exercise options tokens
+        vm.expectRevert(bytes4(keccak256("OptionsToken__PastDeadline()")));
+        optionsToken.exercise(amount, expectedPaymentAmount, recipient, deadline);
+    }
 }

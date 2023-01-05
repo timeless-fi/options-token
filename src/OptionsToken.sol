@@ -27,6 +27,7 @@ contract OptionsToken is ERC20, Owned, IERC20Mintable {
     /// Errors
     /// -----------------------------------------------------------------------
 
+    error OptionsToken__PastDeadline();
     error OptionsToken__NotTokenAdmin();
     error OptionsToken__SlippageTooHigh();
 
@@ -124,23 +125,25 @@ contract OptionsToken is ERC20, Owned, IERC20Mintable {
         virtual
         returns (uint256 paymentAmount)
     {
-        // skip if amount is zero
-        if (amount == 0) return 0;
+        return _exercise(amount, maxPaymentAmount, recipient);
+    }
 
-        // transfer options tokens from msg.sender to address(0)
-        // we transfer instead of burn because TokenAdmin cares about totalSupply
-        // which we don't want to change in order to follow the emission schedule
-        transfer(address(0), amount);
-
-        // transfer payment tokens from msg.sender to the treasury
-        paymentAmount = amount.mulWadUp(oracle.getPrice());
-        if (paymentAmount > maxPaymentAmount) revert OptionsToken__SlippageTooHigh();
-        paymentToken.safeTransferFrom(msg.sender, treasury, paymentAmount);
-
-        // mint underlying tokens to recipient
-        underlyingToken.mint(recipient, amount);
-
-        emit Exercise(msg.sender, recipient, amount, paymentAmount);
+    /// @notice Exercises options tokens to purchase the underlying tokens.
+    /// @dev The options tokens are not burnt but sent to address(0) to avoid messing up the
+    /// inflation schedule.
+    /// The oracle may revert if it cannot give a secure result.
+    /// @param amount The amount of options tokens to exercise
+    /// @param maxPaymentAmount The maximum acceptable amount to pay. Used for slippage protection.
+    /// @param recipient The recipient of the purchased underlying tokens
+    /// @param deadline The Unix timestamp (in seconds) after which the call will revert
+    /// @return paymentAmount The amount paid to the treasury to purchase the underlying tokens
+    function exercise(uint256 amount, uint256 maxPaymentAmount, address recipient, uint256 deadline)
+        external
+        virtual
+        returns (uint256 paymentAmount)
+    {
+        if (block.timestamp > deadline) revert OptionsToken__PastDeadline();
+        return _exercise(amount, maxPaymentAmount, recipient);
     }
 
     /// -----------------------------------------------------------------------
@@ -159,5 +162,33 @@ contract OptionsToken is ERC20, Owned, IERC20Mintable {
     function setTreasury(address treasury_) external onlyOwner {
         treasury = treasury_;
         emit SetTreasury(treasury_);
+    }
+
+    /// -----------------------------------------------------------------------
+    /// Internal functions
+    /// -----------------------------------------------------------------------
+
+    function _exercise(uint256 amount, uint256 maxPaymentAmount, address recipient)
+        internal
+        virtual
+        returns (uint256 paymentAmount)
+    {
+        // skip if amount is zero
+        if (amount == 0) return 0;
+
+        // transfer options tokens from msg.sender to address(0)
+        // we transfer instead of burn because TokenAdmin cares about totalSupply
+        // which we don't want to change in order to follow the emission schedule
+        transfer(address(0), amount);
+
+        // transfer payment tokens from msg.sender to the treasury
+        paymentAmount = amount.mulWadUp(oracle.getPrice());
+        if (paymentAmount > maxPaymentAmount) revert OptionsToken__SlippageTooHigh();
+        paymentToken.safeTransferFrom(msg.sender, treasury, paymentAmount);
+
+        // mint underlying tokens to recipient
+        underlyingToken.mint(recipient, amount);
+
+        emit Exercise(msg.sender, recipient, amount, paymentAmount);
     }
 }
