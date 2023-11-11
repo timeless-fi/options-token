@@ -3,39 +3,34 @@ pragma solidity ^0.8.13;
 
 import {Owned} from "solmate/auth/Owned.sol";
 import {ERC20} from "solmate/tokens/ERC20.sol";
-import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
-import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 
 import {IOracle} from "./interfaces/IOracle.sol";
 import {IERC20Mintable} from "./interfaces/IERC20Mintable.sol";
+import {IExercise} from "./interfaces/IExercise.sol";
+
+struct Option {
+    address impl;
+    bool isActive;
+}
 
 /// @title Options Token
 /// @author zefram.eth
-/// @notice Options token representing the right to purchase the underlying token
-/// at an oracle-specified rate. Similar to call options but with a variable strike
-/// price that's always at a certain discount to the market price.
-/// @dev Assumes the underlying token and the payment token both use 18 decimals.
+/// @notice Options token representing the right to perform an advantageous action,
+/// such as purchasing the underlying token at a discount to the market price.
 contract OptionsToken is ERC20, Owned, IERC20Mintable {
-    /// -----------------------------------------------------------------------
-    /// Library usage
-    /// -----------------------------------------------------------------------
-
-    using SafeTransferLib for ERC20;
-    using FixedPointMathLib for uint256;
-
     /// -----------------------------------------------------------------------
     /// Errors
     /// -----------------------------------------------------------------------
 
     error OptionsToken__PastDeadline();
     error OptionsToken__NotTokenAdmin();
-    error OptionsToken__SlippageTooHigh();
+    error OptionsToken__NotActive();
 
     /// -----------------------------------------------------------------------
     /// Events
     /// -----------------------------------------------------------------------
 
-    event Exercise(address indexed sender, address indexed recipient, uint256 amount, uint256 paymentAmount);
+    event Exercise(address indexed sender, address indexed recipient, uint256 amount, bytes parameters);
     event SetOracle(IOracle indexed newOracle);
     event SetTreasury(address indexed newTreasury);
 
@@ -46,22 +41,11 @@ contract OptionsToken is ERC20, Owned, IERC20Mintable {
     /// @notice The contract that has the right to mint options tokens
     address public immutable tokenAdmin;
 
-    /// @notice The token paid by the options token holder during redemption
-    ERC20 public immutable paymentToken;
-
-    /// @notice The underlying token purchased during redemption
-    IERC20Mintable public immutable underlyingToken;
-
     /// -----------------------------------------------------------------------
     /// Storage variables
     /// -----------------------------------------------------------------------
 
-    /// @notice The oracle contract that provides the current price to purchase
-    /// the underlying token while exercising options (the strike price)
-    IOracle public oracle;
-
-    /// @notice The treasury address which receives tokens paid during redemption
-    address public treasury;
+    Option[] public options;
 
     /// -----------------------------------------------------------------------
     /// Constructor
@@ -71,20 +55,9 @@ contract OptionsToken is ERC20, Owned, IERC20Mintable {
         string memory name_,
         string memory symbol_,
         address owner_,
-        address tokenAdmin_,
-        ERC20 paymentToken_,
-        IERC20Mintable underlyingToken_,
-        IOracle oracle_,
-        address treasury_
+        address tokenAdmin_
     ) ERC20(name_, symbol_, 18) Owned(owner_) {
         tokenAdmin = tokenAdmin_;
-        paymentToken = paymentToken_;
-        underlyingToken = underlyingToken_;
-        oracle = oracle_;
-        treasury = treasury_;
-
-        emit SetOracle(oracle_);
-        emit SetTreasury(treasury_);
     }
 
     /// -----------------------------------------------------------------------
@@ -112,83 +85,82 @@ contract OptionsToken is ERC20, Owned, IERC20Mintable {
         _mint(to, amount);
     }
 
-    /// @notice Exercises options tokens to purchase the underlying tokens.
+    /// @notice Exercises options tokens, giving the reward to the recipient.
+    /// @dev WARNING: If `amount` is zero, the bytes returned will be empty and therefore, not decodable.
     /// @dev The options tokens are not burnt but sent to address(0) to avoid messing up the
     /// inflation schedule.
-    /// The oracle may revert if it cannot give a secure result.
     /// @param amount The amount of options tokens to exercise
-    /// @param maxPaymentAmount The maximum acceptable amount to pay. Used for slippage protection.
-    /// @param recipient The recipient of the purchased underlying tokens
-    /// @return paymentAmount The amount paid to the treasury to purchase the underlying tokens
-    function exercise(uint256 amount, uint256 maxPaymentAmount, address recipient)
+    /// @param recipient The recipient of the reward
+    /// @param params Extra parameters to be used by the exercise function
+    function exercise(uint256 amount, address recipient, uint256 optionId, bytes calldata params)
         external
         virtual
-        returns (uint256 paymentAmount)
+        returns (bytes memory)
     {
-        return _exercise(amount, maxPaymentAmount, recipient);
+        return _exercise(amount, recipient, optionId, params);
     }
 
-    /// @notice Exercises options tokens to purchase the underlying tokens.
+    /// @notice Exercises options tokens, giving the reward to the recipient.
+    /// @dev WARNING: If `amount` is zero, the bytes returned will be empty and therefore, not decodable.
     /// @dev The options tokens are not burnt but sent to address(0) to avoid messing up the
     /// inflation schedule.
-    /// The oracle may revert if it cannot give a secure result.
     /// @param amount The amount of options tokens to exercise
-    /// @param maxPaymentAmount The maximum acceptable amount to pay. Used for slippage protection.
-    /// @param recipient The recipient of the purchased underlying tokens
-    /// @param deadline The Unix timestamp (in seconds) after which the call will revert
-    /// @return paymentAmount The amount paid to the treasury to purchase the underlying tokens
-    function exercise(uint256 amount, uint256 maxPaymentAmount, address recipient, uint256 deadline)
+    /// @param recipient The recipient of the reward
+    /// @param params Extra parameters to be used by the exercise function
+    /// @param deadline The deadline by which the transaction must be mined
+    function exercise(uint256 amount, address recipient, uint256 optionId, bytes calldata params, uint256 deadline)
         external
         virtual
-        returns (uint256 paymentAmount)
+        returns (bytes memory)
     {
         if (block.timestamp > deadline) revert OptionsToken__PastDeadline();
-        return _exercise(amount, maxPaymentAmount, recipient);
+        return _exercise(amount, recipient, optionId, params);
     }
 
     /// -----------------------------------------------------------------------
     /// Owner functions
     /// -----------------------------------------------------------------------
 
-    /// @notice Sets the oracle contract. Only callable by the owner.
-    /// @param oracle_ The new oracle contract
-    function setOracle(IOracle oracle_) external onlyOwner {
-        oracle = oracle_;
-        emit SetOracle(oracle_);
+    /// @notice Adds a new Exercise contract to the available options.
+    /// @param impl Address of the Exercise contract, that implements BaseExercise.
+    /// @param isActive Whether oToken holders should be allowed to exercise using this option.
+    function addOption(address impl, bool isActive) external onlyOwner {
+        options.push(Option({impl: impl, isActive: isActive}));
     }
 
-    /// @notice Sets the treasury address. Only callable by the owner.
-    /// @param treasury_ The new treasury address
-    function setTreasury(address treasury_) external onlyOwner {
-        treasury = treasury_;
-        emit SetTreasury(treasury_);
+    /// @notice Sets an option as active or not. Determines if holders can use it to exercise.
+    /// @param optionId The option's ID.
+    /// @param isActive Whether oToken holders should be allowed to exercise using this option.
+    function setOptionActive(uint256 optionId, bool isActive) external onlyOwner {
+        options[optionId].isActive = isActive;
     }
 
     /// -----------------------------------------------------------------------
     /// Internal functions
     /// -----------------------------------------------------------------------
 
-    function _exercise(uint256 amount, uint256 maxPaymentAmount, address recipient)
+    function _exercise(uint256 amount, address recipient, uint256 optionId, bytes calldata params)
         internal
         virtual
-        returns (uint256 paymentAmount)
+        returns (bytes memory data)
     {
         // skip if amount is zero
-        if (amount == 0) return 0;
+        if (amount == 0) return new bytes(0);
+
+        // get option
+        Option memory option = options[optionId];
+
+        // skip if option is not active
+        if (!option.isActive) revert OptionsToken__NotActive();
 
         // transfer options tokens from msg.sender to address(0)
         // we transfer instead of burn because TokenAdmin cares about totalSupply
         // which we don't want to change in order to follow the emission schedule
         transfer(address(0), amount);
 
-        // transfer payment tokens from msg.sender to the treasury
-        paymentAmount = amount.mulWadUp(oracle.getPrice());
-        if (paymentAmount > maxPaymentAmount) revert OptionsToken__SlippageTooHigh();
-        paymentToken.safeTransferFrom(msg.sender, treasury, paymentAmount);
+        // give rewards to recipient
+        data = IExercise(option.impl).exercise(msg.sender, amount, recipient, params);
 
-        // mint underlying tokens to recipient
-        underlyingToken.mint(recipient, amount);
-
-        emit Exercise(msg.sender, recipient, amount, paymentAmount);
+        emit Exercise(msg.sender, recipient, amount, params);
     }
 }
