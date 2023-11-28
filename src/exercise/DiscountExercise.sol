@@ -8,7 +8,6 @@ import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 
 import {BaseExercise} from "../exercise/BaseExercise.sol";
 import {IOracle} from "../interfaces/IOracle.sol";
-import {IERC20Mintable} from "../interfaces/IERC20Mintable.sol";
 import {OptionsToken} from "../OptionsToken.sol";
 
 struct DiscountExerciseParams {
@@ -43,7 +42,7 @@ contract DiscountExercise is BaseExercise, Owned {
     ERC20 public immutable paymentToken;
 
     /// @notice The underlying token purchased during redemption
-    IERC20Mintable public immutable underlyingToken;
+    ERC20 public immutable underlyingToken;
 
     /// Storage variables
 
@@ -58,7 +57,7 @@ contract DiscountExercise is BaseExercise, Owned {
         OptionsToken oToken_,
         address owner_,
         ERC20 paymentToken_,
-        IERC20Mintable underlyingToken_,
+        ERC20 underlyingToken_,
         IOracle oracle_,
         address treasury_
     ) BaseExercise(oToken_) Owned(owner_) {
@@ -86,7 +85,6 @@ contract DiscountExercise is BaseExercise, Owned {
         onlyOToken
         returns (bytes memory data)
     {
-        if (msg.sender != address(oToken)) revert Exercise__NotOToken();
         return _exercise(from, amount, recipient, params);
     }
 
@@ -122,7 +120,7 @@ contract DiscountExercise is BaseExercise, Owned {
         paymentToken.safeTransferFrom(from, treasury, paymentAmount);
 
         // mint underlying tokens to recipient
-        underlyingToken.mint(recipient, amount);
+        underlyingToken.safeTransfer(recipient, amount);
 
         data = abi.encode(
             DiscountExerciseReturnData({
