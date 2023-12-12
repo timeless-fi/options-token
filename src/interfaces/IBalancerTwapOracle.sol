@@ -14,6 +14,8 @@
 
 pragma solidity ^0.8.0;
 
+import {IVault} from "../interfaces/IBalancerVault.sol";
+
 /**
  * @dev Interface for querying historical data from a Pool that can be used as a Price Oracle.
  *
@@ -25,6 +27,13 @@ pragma solidity ^0.8.0;
  * is not older than the largest safe query window.
  */
 interface IBalancerTwapOracle {
+    /**
+     * @notice Returns the Balancer Vault
+     */
+    function getVault() external view returns (IVault);
+
+    function getPoolId() external view returns (bytes32);
+
     // The three values that can be queried:
     //
     // - PAIR_PRICE: the price of the tokens in the Pool, expressed as the price of the second token in units of the

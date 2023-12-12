@@ -5,6 +5,7 @@ import {Owned} from "solmate/auth/Owned.sol";
 import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 
 import {IOracle} from "../interfaces/IOracle.sol";
+import {IVault} from "../interfaces/IBalancerVault.sol";
 import {IBalancerTwapOracle} from "../interfaces/IBalancerTwapOracle.sol";
 
 /// @title Oracle using Balancer TWAP oracle as data source
@@ -12,10 +13,7 @@ import {IBalancerTwapOracle} from "../interfaces/IBalancerTwapOracle.sol";
 /// @notice The oracle contract that provides the current price to purchase
 /// the underlying token while exercising options. Uses Balancer TWAP oracle
 /// as data source, and then applies a multiplier & lower bound.
-/// @dev IMPORTANT: The Balancer pool must use the payment token of the options
-/// token as the first token and the underlying token as the second token, due to
-/// how the Balancer oracle represents the price.
-/// Furthermore, the payment token and the underlying token must use 18 decimals.
+/// @dev IMPORTANT: The payment token and the underlying token must use 18 decimals.
 /// This is because the Balancer oracle returns the TWAP value in 18 decimals
 /// and the OptionsToken contract also expects 18 decimals.
 contract BalancerOracle is IOracle, Owned {
@@ -30,6 +28,7 @@ contract BalancerOracle is IOracle, Owned {
     /// -----------------------------------------------------------------------
 
     error BalancerOracle__TWAPOracleNotReady();
+    error BalancerOracle__BelowMinPrice();
 
     /// -----------------------------------------------------------------------
     /// Events
@@ -71,12 +70,17 @@ contract BalancerOracle is IOracle, Owned {
     /// price to mitigate potential attacks on the TWAP oracle.
     uint128 public minPrice;
 
+    /// @notice Whether the price should be returned in terms of token0.
+    /// If false, the price is returned in terms of token1.
+    bool public isToken0;
+
     /// -----------------------------------------------------------------------
     /// Constructor
     /// -----------------------------------------------------------------------
 
     constructor(
         IBalancerTwapOracle balancerTwapOracle_,
+        address token,
         address owner_,
         uint16 multiplier_,
         uint56 secs_,
@@ -84,6 +88,11 @@ contract BalancerOracle is IOracle, Owned {
         uint128 minPrice_
     ) Owned(owner_) {
         balancerTwapOracle = balancerTwapOracle_;
+
+        IVault vault = balancerTwapOracle.getVault();
+        (address[] memory poolTokens,,) = vault.getPoolTokens(balancerTwapOracle_.getPoolId());
+        isToken0 = poolTokens[0] == token;
+
         multiplier = multiplier_;
         secs = secs_;
         ago = ago_;
@@ -132,11 +141,16 @@ contract BalancerOracle is IOracle, Owned {
             price = balancerTwapOracle.getTimeWeightedAverage(queries)[0];
         }
 
+        if (isToken0) {
+            // convert price to token0
+            price = uint256(1e18).divWadDown(price);
+        }
+
+        // apply min price
+        if (price < minPrice_) revert BalancerOracle__BelowMinPrice();
+
         // apply multiplier to price
         price = price.mulDivUp(multiplier_, MULTIPLIER_DENOM);
-
-        // bound price above minPrice
-        price = price < minPrice_ ? minPrice_ : price;
     }
 
     /// -----------------------------------------------------------------------
@@ -151,7 +165,11 @@ contract BalancerOracle is IOracle, Owned {
     /// would be (block.timestamp - secs - ago, block.timestamp - ago].
     /// @param minPrice_ The minimum value returned by getPrice(). Maintains a floor for the
     /// price to mitigate potential attacks on the TWAP oracle.
-    function setParams(uint16 multiplier_, uint56 secs_, uint56 ago_, uint128 minPrice_) external onlyOwner {
+    function setParams(address token, uint16 multiplier_, uint56 secs_, uint56 ago_, uint128 minPrice_) external onlyOwner {
+        IVault vault = balancerTwapOracle.getVault();
+        (address[] memory poolTokens,,) = vault.getPoolTokens(balancerTwapOracle.getPoolId());
+        isToken0 = poolTokens[0] == token;
+
         multiplier = multiplier_;
         secs = secs_;
         ago = ago_;
