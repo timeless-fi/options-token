@@ -14,6 +14,8 @@
 
 pragma solidity ^0.8.0;
 
+import {IVault} from "../interfaces/IBalancerVault.sol";
+
 /**
  * @dev Interface for querying historical data from a Pool that can be used as a Price Oracle.
  *
@@ -25,6 +27,13 @@ pragma solidity ^0.8.0;
  * is not older than the largest safe query window.
  */
 interface IBalancerTwapOracle {
+    /**
+     * @notice Returns the Balancer Vault
+     */
+    function getVault() external view returns (IVault);
+
+    function getPoolId() external view returns (bytes32);
+
     // The three values that can be queried:
     //
     // - PAIR_PRICE: the price of the tokens in the Pool, expressed as the price of the second token in units of the
@@ -47,10 +56,7 @@ interface IBalancerTwapOracle {
      * @dev Returns the time average weighted price corresponding to each of `queries`. Prices are represented as 18
      * decimal fixed point values.
      */
-    function getTimeWeightedAverage(OracleAverageQuery[] memory queries)
-        external
-        view
-        returns (uint256[] memory results);
+    function getTimeWeightedAverage(OracleAverageQuery[] memory queries) external view returns (uint256[] memory results);
 
     /**
      * @dev Returns latest sample of `variable`. Prices are represented as 18 decimal fixed point values.
@@ -82,10 +88,7 @@ interface IBalancerTwapOracle {
     /**
      * @dev Returns the accumulators corresponding to each of `queries`.
      */
-    function getPastAccumulators(OracleAccumulatorQuery[] memory queries)
-        external
-        view
-        returns (int256[] memory results);
+    function getPastAccumulators(OracleAccumulatorQuery[] memory queries) external view returns (int256[] memory results);
 
     /**
      * @dev Information for an Accumulator query.

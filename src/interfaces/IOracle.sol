@@ -11,4 +11,7 @@ interface IOracle {
     /// For example, if the payment token is $2 and the strike price is $4, the return value
     /// would be 2e18.
     function getPrice() external view returns (uint256 price);
+
+    /// @notice This is important for verifying compatibility between oracle and exercise.
+    function getTokens() external view returns (address paymentToken, address underlyingToken);
 }

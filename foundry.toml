@@ -1,7 +1,10 @@
 [profile.default]
 optimizer_runs = 1000000
 verbosity = 1
-via_ir = true
+via_ir = false
+
+[fmt]
+line_length = 150
 
 # Extreme Fuzzing CI Profile :P
 [profile.ci]

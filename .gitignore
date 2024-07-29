@@ -9,3 +9,12 @@ out/
 
 # Dotenv file
 .env
+
+# Hardhat
+node_modules/
+artifacts/
+cache_hardhat/
+typechain-types/
+
+*settings.json
+
